@@ -46,7 +46,7 @@ python -m pip install pytest pytest-cov
 Option B: Conda
 
 ```powershell
-conda create -n mrtd python=3.10 -y
+conda create -n mrtd python=3.7.9 -y
 conda activate mrtd
 pip install pytest pytest-cov
 ```
