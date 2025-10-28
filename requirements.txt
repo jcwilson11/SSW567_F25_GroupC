@@ -2,3 +2,4 @@
 # Test and tooling requirements
 pytest>=7.4
 pytest-cov>=4.1
+MutPy==0.6.1
