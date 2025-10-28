@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MutPy mutation report - mutation #256</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+    
+<link href="http://alexgorbatchev.com/pub/sh/current/styles/shCore.css" rel="stylesheet" type="text/css" />
+<link href="http://alexgorbatchev.com/pub/sh/current/styles/shThemeDefault.css" rel="stylesheet" type="text/css" />
+
+    <script src="https://code.jquery.com/jquery.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]-->
+    
+<script src="http://alexgorbatchev.com/pub/sh/current/scripts/shCore.js" type="text/javascript"></script>
+<script src="http://alexgorbatchev.com/pub/sh/current/scripts/shBrushPython.js" type="text/javascript"></script>
+<script type="text/javascript">
+    SyntaxHighlighter.all();
+    window.setTimeout(function () {
+        
+        $('.line.number271').attr('title', 'CRP');
+        
+    }, 0);
+</script>
+
+</head>
+<body>
+    <div class="container">
+        
+<div class="page-header">
+    <h1>Mutation #256</h1>
+</div>
+<h3>Details</h3>
+<ul>
+    <li>module - <code><module 'MRTD' from '.\\MRTD.py'></code></li>
+    <li><span class="label label-success">killed</span> by <code>MTTDtest.py::test_encode_decode_validate_round_trip</code></li>
+    
+    <li>duration - 0.042 s</li>
+    
+    
+    <li>tests run - 3</li>
+    
+</ul>
+
+<h3>Exception traceback</h3>
+<pre>def test_encode_decode_validate_round_trip():
+        fields = {
+            'document_type': 'P',
+            'issuing_state': 'USA',
+            'surname': 'DOE',
+            'given_names': 'JANE MARIE',
+            'passport_number': '123456789',
+            'nationality': 'USA',
+            'birth_date': '1990-07-05',
+            'sex': 'F',
+            'expiry_date': '2030-01-31',
+            'personal_number': 'ABC123',
+        }
+        l1, l2 = encode_mrz(fields)
+        parsed = decode_mrz(l1, l2)
+    
+        assert len(l1) == 44 and len(l2) == 44
+        assert parsed['document_type'].startswith('P')
+        assert parsed['issuing_state'][:3] == 'USA'
+        assert parsed['passport_number'] == '123456789'
+        assert parsed['nationality'] == 'USA'
+        assert parsed['birth_date'] == '900705'  # YYMMDD from 1990-07-05
+        assert parsed['sex'] == 'F'
+        assert parsed['expiry_date'] == '300131'  # YYMMDD from 2030-01-31
+    
+        result = validate_mrz(l1, l2)
+>       assert result['valid'] is True
+E       AssertionError
+
+MTTDtest.py:74: AssertionError</pre>
+
+<h3>Mutations</h3>
+<ul>
+    
+    <li>CRP - line 271</li>
+    
+</ul>
+<h3>Mutant</h3>
+<pre class="brush: python; first-line: 1; highlight: [271]; toolbar: false;">'''
+MRTD - Machine Readable Travel Document utilities
+
+Implements:
+- scan_mrz(): software stub for hardware MRZ scanner (requirement #1)
+- decode_mrz(): parse two MRZ lines into fields and extract check digits (requirement #2)
+- encode_mrz(): build two MRZ lines from fields and embed check digits (requirement #3)
+- validate_mrz(): recompute and report any check-digit mismatches (requirement #4)
+
+Notes:
+- Format assumed is ICAO TD3 (passports): 2 lines, 44 chars each.
+- Check digit algorithm per assignment: Fletcher-4 (adapted to mod 10, single digit).
+- Database interaction stub provided via query_document_fields(), left unimplemented as required.
+'''
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Optional
+
+
+
+
+
+def scan_mrz() -> Tuple[(str, str)]:
+    '''
+	Software-facing API to obtain the two MRZ lines from a hardware scanner.
+
+	This is a hardware dependency. Per requirements, this function is defined
+	but intentionally left unimplemented.
+
+	Returns
+	-------
+	(line1, line2): two strings representing the MRZ lines.
+	'''
+    raise NotImplementedError('Hardware scanner integration not implemented.')
+
+
+
+
+
+def query_document_fields(document_id: str) -> Dict[(str, str)]:
+    """
+	Placeholder for database query that returns MRTD fields used by encode_mrz.
+
+	This function is intentionally left empty per the requirements.
+
+	Expected keys (TD3):
+	  - document_type (e.g., 'P')
+	  - issuing_state (3-letter code)
+	  - surname
+	  - given_names (space-separated or list joined by spaces)
+	  - passport_number (<= 9 chars, alnum)
+	  - nationality (3-letter code)
+	  - birth_date (YYMMDD or YYYY-MM-DD)
+	  - sex ('M','F','X' or other)
+	  - expiry_date (YYMMDD or YYYY-MM-DD)
+	  - personal_number (optional, up to 14)
+	"""
+    raise NotImplementedError('Database access not implemented.')
+
+
+
+
+
+def _mrz_char_value(ch: str) -> int:
+    """
+	Map MRZ character to numeric value for checksum purposes.
+	- digits '0'-'9' => 0-9
+	- letters 'A'-'Z' => 10-35
+	- filler '<' => 0
+	Other characters are treated as filler (0).
+	"""
+    if not ch:
+        return 0
+    c = ch.upper()
+    if '0' <= c <= '9':
+        return ord(c) - ord('0')
+    if 'A' <= c <= 'Z':
+        return (10 + ord(c)) - ord('A')
+    if c == '<':
+        return 0
+    return 0
+
+
+def fletcher4_check_digit(data: str) -> str:
+    """
+	Compute a single-digit check using a Fletcher-like checksum with mod 10.
+
+	This adaptation keeps two running sums (sum1, sum2), both modulo 10,
+	over the MRZ-mapped character values, then returns (sum1 + sum2) % 10
+	as the check digit.
+
+	Parameters
+	----------
+	data: str
+		Input string comprised of MRZ characters (A-Z, 0-9, '<').
+
+	Returns
+	-------
+	str: a single decimal digit as a string
+	"""
+    sum1 = 0
+    sum2 = 0
+    for ch in data:
+        v = _mrz_char_value(ch)
+        sum1 = (sum1 + v) % 10
+        sum2 = (sum2 + sum1) % 10
+    return str((sum1 + sum2) % 10)
+
+
+def _sanitize_name(part: str) -> str:
+    """
+	Sanitize a name part to MRZ format (letters/digits) with '<' as separator.
+	- Convert to uppercase
+	- Replace spaces and hyphens with '<'
+	- Remove characters outside [A-Z0-9<]
+	"""
+    if part is None:
+        return ''
+    s = part.upper().replace(' ', '<').replace('-', '<')
+    
+    cleaned = []
+    for ch in s:
+        if ('A' <= ch <= 'Z' or '0' <= ch <= '9' or ch == '<'):
+            cleaned.append(ch)
+    return ''.join(cleaned)
+
+
+def _pad(value: str, length: int) -> str:
+    v = (value or '').upper()
+    v = v.replace(' ', '<')
+    if len(v) > length:
+        return v[:length]
+    return v + ('<' * (length - len(v)))
+
+
+def _to_yyMMdd(date_str: str) -> str:
+    """
+	Convert 'YYYY-MM-DD' or 'YYMMDD' into 'YYMMDD' string; pass through if already 6 digits.
+	Raises ValueError if no valid conversion is possible.
+	"""
+    if not date_str:
+        raise ValueError('Missing date value')
+    ds = date_str.strip()
+    
+    if (len(ds) == 6 and ds.isdigit()):
+        return ds
+    
+    for sep in ('-', '/', '.'):
+        if sep in ds:
+            parts = ds.split(sep)
+            if (len(parts) == 3 and all(parts)):
+                (y, m, d) = parts
+                if (len(y) == 4 and len(m) == 2 and len(d) == 2 and y.isdigit() and m.isdigit() and d.isdigit()):
+                    return (y[2:] + m) + d
+    raise ValueError(f'Invalid date format: {date_str}')
+
+
+
+
+
+def encode_mrz(fields: Dict[(str, str)]) -> Tuple[(str, str)]:
+    '''
+	Encode travel document fields into two MRZ lines (TD3) including check digits.
+
+	Parameters
+	----------
+	fields: dict with keys:
+		document_type, issuing_state, surname, given_names,
+		passport_number, nationality, birth_date, sex,
+		expiry_date, personal_number (optional)
+
+	Returns
+	-------
+	(line1, line2): two 44-character MRZ lines.
+	'''
+    
+    document_type = _pad((fields.get('document_type') or 'P'), 2)
+    issuing_state = _pad(fields.get('issuing_state', ''), 3)
+    
+    
+    surname = _sanitize_name(fields.get('surname', ''))
+    given = fields.get('given_names')
+    if isinstance(given, list):
+        given = ' '.join(given)
+    given = _sanitize_name((given or ''))
+    name_field = (surname + '<<') + given if given else surname + '<<'
+    name_field = _pad(name_field, 39)
+    line1 = (document_type + issuing_state) + name_field
+    if len(line1) != 44:
+        line1 = line1[:44]
+    
+    
+    passport_number = _pad(fields.get('passport_number', ''), 9)
+    passport_cd = fletcher4_check_digit(passport_number)
+    
+    nationality = _pad(fields.get('nationality', ''), 3)
+    
+    birth_date = _to_yyMMdd(fields.get('birth_date', ''))
+    birth_cd = fletcher4_check_digit(birth_date)
+    
+    sex = (fields.get('sex') or '<').upper()[:1]
+    if sex not in ('M', 'F', 'X', '<'):
+        sex = '<'
+    
+    expiry_date = _to_yyMMdd(fields.get('expiry_date', ''))
+    expiry_cd = fletcher4_check_digit(expiry_date)
+    
+    personal_number = _pad(fields.get('personal_number', ''), 14)
+    personal_cd = fletcher4_check_digit(personal_number)
+    
+    
+    composite_source = \
+        \
+        ((((((passport_number + passport_cd) + birth_date) + birth_cd) + expiry_date) + expiry_cd) + personal_number) + personal_cd
+    
+    composite_cd = fletcher4_check_digit(composite_source)
+    
+    line2 = \
+        \
+        (((((((((passport_number + passport_cd) + nationality) + birth_date) + birth_cd) + sex) + expiry_date) + expiry_cd) + personal_number) + personal_cd) + composite_cd
+    
+    
+    if len(line2) < 44:
+        line2 = line2 + ('<' * (44 - len(line2)))
+    elif len(line2) > 44:
+        line2 = line2[:44]
+    
+    return (line1, line2)
+
+
+
+
+
+def decode_mrz(line1: str, line2: str) -> Dict[(str, str)]:
+    '''
+	Decode two MRZ lines (TD3) into their fields and extract the embedded check digits.
+
+	Returns
+	-------
+	dict with keys:
+	  document_type, issuing_state, surname, given_names,
+	  passport_number, passport_number_cd, nationality,
+	  birth_date, birth_date_cd, sex,
+	  expiry_date, expiry_date_cd,
+	  personal_number, personal_number_cd, composite_cd
+	'''
+    l1 = (line1 or '').ljust(44, '<')[:44]
+    l2 = (line2 or '').ljust(44, '<')[:44]
+    
+    document_type = l1[0:2]
+    issuing_state = l1[2:5]
+    names = l1[5:44]
+    
+    
+    if '<<' in names:
+        (sname, gname) = names.split('<<', 1)
+    else:
+        (sname, gname) = (names, '')
+    surname = sname.replace('<', ' ').strip()
+    given_names = gname.replace('<', ' ').strip()
+    
+    passport_number = l2[0:9]
+    passport_number_cd = l2[9]
+    nationality = l2[10:13]
+    birth_date = l2[13:19]
+    birth_date_cd = l2[19]
+    sex = l2[20]
+    expiry_date = l2[21:27]
+    expiry_date_cd = l2[28]
+    personal_number = l2[28:42]
+    personal_number_cd = l2[42]
+    composite_cd = l2[43]
+    
+    return {\
+        'document_type': document_type, \
+        'issuing_state': issuing_state, \
+        'surname': surname, \
+        'given_names': given_names, \
+        'passport_number': passport_number, \
+        'passport_number_cd': passport_number_cd, \
+        'nationality': nationality, \
+        'birth_date': birth_date, \
+        'birth_date_cd': birth_date_cd, \
+        'sex': sex, \
+        'expiry_date': expiry_date, \
+        'expiry_date_cd': expiry_date_cd, \
+        'personal_number': personal_number, \
+        'personal_number_cd': personal_number_cd, \
+        'composite_cd': composite_cd}
+
+
+
+
+
+
+def validate_mrz(line1: str, line2: str) -> Dict[(str, object)]:
+    '''
+	Recompute check digits using Fletcher-4 and report per-field mismatches.
+
+	Returns
+	-------
+	dict with keys:
+	  valid: bool
+	  mismatches: List[str] (human-readable descriptions)
+	'''
+    parsed = decode_mrz(line1, line2)
+    
+    mismatchesList[str][]
+    
+    
+    if fletcher4_check_digit(parsed['passport_number']) != parsed['passport_number_cd']:
+        mismatches.append('passport_number check digit mismatch')
+    
+    if fletcher4_check_digit(parsed['birth_date']) != parsed['birth_date_cd']:
+        mismatches.append('birth_date check digit mismatch')
+    
+    if fletcher4_check_digit(parsed['expiry_date']) != parsed['expiry_date_cd']:
+        mismatches.append('expiry_date check digit mismatch')
+    
+    if fletcher4_check_digit(parsed['personal_number']) != parsed['personal_number_cd']:
+        mismatches.append('personal_number check digit mismatch')
+    
+    
+    composite_source = \
+        \
+        \
+        \
+        ((((((parsed['passport_number'] + parsed['passport_number_cd']) + parsed['birth_date']) + parsed['birth_date_cd']) + parsed['expiry_date']) + parsed['expiry_date_cd']) + parsed['personal_number']) + parsed['personal_number_cd']
+    
+    if fletcher4_check_digit(composite_source) != parsed['composite_cd']:
+        mismatches.append('composite check digit mismatch')
+    
+    return {\
+        'valid': len(mismatches) == 0, \
+        'mismatches': mismatches, \
+        'fields': parsed}
+
+
+
+
+
+
+if __name__ == '__main__':
+    sample = {\
+        'document_type': 'P', \
+        'issuing_state': 'USA', \
+        'surname': 'DOE', \
+        'given_names': 'JANE MARIE', \
+        'passport_number': '123456789', \
+        'nationality': 'USA', \
+        'birth_date': '1990-07-05', \
+        'sex': 'F', \
+        'expiry_date': '2030-01-31', \
+        'personal_number': 'ABC123'}
+    
+    (l1, l2) = encode_mrz(sample)
+    print('Line1:', l1)
+    print('Line2:', l2)
+    result = validate_mrz(l1, l2)
+    print('Valid:', result['valid'])
+    if not (result['valid']):
+        print('Mismatches:', result['mismatches'])</pre>
+
+    </div>
+</body>
+</html>
