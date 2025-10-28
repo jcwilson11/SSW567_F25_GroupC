@@ -36,14 +36,42 @@
 <h3>Details</h3>
 <ul>
     <li>module - <code><module 'MRTD' from '.\\MRTD.py'></code></li>
-    <li><span class="label label-danger">survived</span></li>
+    <li><span class="label label-success">killed</span> by <code>MTTDtest.py::test_encode_accepts_dot_separator_dates</code></li>
     
-    <li>duration - 0.056 s</li>
+    <li>duration - 0.118 s</li>
     
     
-    <li>tests run - 53</li>
+    <li>tests run - 72</li>
     
 </ul>
+
+<h3>Exception traceback</h3>
+<pre>def test_encode_accepts_dot_separator_dates():
+        f = {
+            "issuing_state": "USA",
+            "surname": "TEST",
+            "given_names": "DOT SEP",
+            "passport_number": "X1234567",
+            "nationality": "USA",
+            "birth_date": "1999.12.31",     # dot separator
+            "sex": "F",
+            "expiry_date": "2035.06.01",    # dot separator
+            "personal_number": "",
+        }
+>       l1, l2 = encode_mrz(f)
+
+MTTDtest.py:826: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+MRTD:200: in encode_mrz
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+date_str = '1999.12.31'
+
+>   ???
+E   ValueError: Invalid date format: 1999.12.31
+
+MRTD:157: ValueError</pre>
 
 <h3>Mutations</h3>
 <ul>

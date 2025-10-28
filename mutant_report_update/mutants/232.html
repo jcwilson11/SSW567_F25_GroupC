@@ -36,14 +36,45 @@
 <h3>Details</h3>
 <ul>
     <li>module - <code><module 'MRTD' from '.\\MRTD.py'></code></li>
-    <li><span class="label label-danger">survived</span></li>
+    <li><span class="label label-success">killed</span> by <code>MTTDtest.py::test_long_name_truncation_and_fillers_still_validates</code></li>
     
-    <li>duration - 0.087 s</li>
+    <li>duration - 0.121 s</li>
     
     
-    <li>tests run - 53</li>
+    <li>tests run - 68</li>
     
 </ul>
+
+<h3>Exception traceback</h3>
+<pre>def test_long_name_truncation_and_fillers_still_validates():
+        fields = {
+            "issuing_state": "USA",
+            "surname": "THISISAREALLYYYYYYYYLONGSURNAME-WITHPUNCTUATION!!",
+            "given_names": "ANNA-MARIA VON DER O'NEILL",
+            "passport_number": "Z12345678",
+            "nationality": "USA",
+            "birth_date": "1992-02-29",
+            "sex": "F",
+            "expiry_date": "2032-02-28",
+            "personal_number": "",
+        }
+        l1, l2 = encode_mrz(fields)
+        # TD3 requires 44 chars per line
+        assert len(l1) == 44 and len(l2) == 44
+>       v = validate_mrz(l1, l2)
+
+MTTDtest.py:765: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+MRTD:308: in validate_mrz
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+line1 = 'P<USATHISISAREALLYYYYYYYYLONGSURNAME<WITHPUN', line2 = 'Z123456786USA9202297F3202283<<<<<<<<<<<<<<05'
+
+>   ???
+E   ValueError: not enough values to unpack (expected 2, got 1)
+
+MRTD:258: ValueError</pre>
 
 <h3>Mutations</h3>
 <ul>

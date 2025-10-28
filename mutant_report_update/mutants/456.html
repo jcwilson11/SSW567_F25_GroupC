@@ -36,14 +36,38 @@
 <h3>Details</h3>
 <ul>
     <li>module - <code><module 'MRTD' from '.\\MRTD.py'></code></li>
-    <li><span class="label label-danger">survived</span></li>
+    <li><span class="label label-success">killed</span> by <code>MTTDtest.py::test_encode_handles_none_given_names_and_splits_correctly</code></li>
     
-    <li>duration - 0.07 s</li>
+    <li>duration - 0.124 s</li>
     
     
-    <li>tests run - 53</li>
+    <li>tests run - 70</li>
     
 </ul>
+
+<h3>Exception traceback</h3>
+<pre>def test_encode_handles_none_given_names_and_splits_correctly():
+        fields = {
+            "document_type": "P",
+            "issuing_state": "USA",
+            "surname": "DOE",
+            "given_names": None,              # <== exercise _sanitize_name(None) -> ''
+            "passport_number": "A1B2C3D4E",
+            "nationality": "USA",
+            "birth_date": "1991-04-09",
+            "sex": "M",
+            "expiry_date": "2031-04-09",
+            "personal_number": "",
+        }
+        l1, l2 = encode_mrz(fields)
+        # There should be a '<<' after the surname with nothing after it
+        assert l1[5:44].startswith("DOE<<")
+        # Decode still yields empty given_names (no trailing garbage)
+        parsed = decode_mrz(l1, l2)
+>       assert parsed["surname"] == "DOE"
+E       AssertionError
+
+MTTDtest.py:798: AssertionError</pre>
 
 <h3>Mutations</h3>
 <ul>
