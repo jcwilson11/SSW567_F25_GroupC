@@ -296,3 +296,251 @@ def test_short_codes_are_padded(short_code, expected):
     assert parsed['nationality'] == expected
     # Still should validate under Fletcher-4 checks
     assert validate_mrz(l1, l2)['valid'] is True
+
+# Additioanl Mutant-killing testing: current rate is 52% killed
+# ------------------------------
+# Independent checksum oracle
+# ------------------------------
+def _mrz_val(ch: str) -> int:
+    c = (ch or "<").upper()
+    if "0" <= c <= "9":
+        return ord(c) - ord("0")
+    if "A" <= c <= "Z":
+        return 10 + ord(c) - ord("A")
+    if c == "<":
+        return 0
+    return 0
+
+def fletcher4_ref(data: str) -> str:
+    s1 = 0
+    s2 = 0
+    for ch in data:
+        v = _mrz_val(ch)
+        s1 = (s1 + v) % 10
+        s2 = (s2 + s1) % 10
+    return str((s1 + s2) % 10)
+
+@pytest.mark.parametrize("payload", [
+    "",                 # all filler
+    "<",                # single filler
+    "A",                # single letter
+    "0",                # single digit
+    "ABC123<",          # mixed
+    "ZZZZZZZZZ",        # worst-case high letters
+    "9Z<5A0<<<<<123",   # varied
+    "<"*20,             # long filler
+])
+def test_fletcher4_matches_reference(payload):
+    assert fletcher4_check_digit(payload) == fletcher4_ref(payload)
+
+# ------------------------------
+# Helpers
+# ------------------------------
+BASE_FIELDS = {
+    "document_type": "P",
+    "issuing_state": "USA",
+    "surname": "DOE",
+    "given_names": "JANE MARIE",
+    "passport_number": "123456789",
+    "nationality": "USA",
+    "birth_date": "1990-07-05",
+    "sex": "F",
+    "expiry_date": "2030-01-31",
+    "personal_number": "ABC123",
+}
+
+def flip_digit_char(ch: str) -> str:
+    # simple deterministic flip to ensure a single-char tamper
+    if ch.isdigit():
+        return "0" if ch != "0" else "1"
+    if ch == "<":
+        return "A"
+    # letter
+    return "Z" if ch != "Z" else "A"
+
+# ------------------------------
+# Single-field tamper tests
+# ------------------------------
+def test_tamper_passport_number_cd_triggers_mismatch():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    # flip the passport-number CD at index 9
+    l2_bad = l2[:9] + flip_digit_char(l2[9]) + l2[10:]
+    out = validate_mrz(l1, l2_bad)
+    assert out["valid"] is False
+    assert "passport_number check digit mismatch" in out["mismatches"]
+
+def test_tamper_birth_date_cd_triggers_mismatch():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    l2_bad = l2[:19] + flip_digit_char(l2[19]) + l2[20:]
+    out = validate_mrz(l1, l2_bad)
+    assert out["valid"] is False
+    assert "birth_date check digit mismatch" in out["mismatches"]
+
+def test_tamper_expiry_date_cd_triggers_mismatch():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    l2_bad = l2[:27] + flip_digit_char(l2[27]) + l2[28:]
+    out = validate_mrz(l1, l2_bad)
+    assert out["valid"] is False
+    assert "expiry_date check digit mismatch" in out["mismatches"]
+
+def test_tamper_personal_number_cd_triggers_mismatch():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    l2_bad = l2[:42] + flip_digit_char(l2[42]) + l2[43:]
+    out = validate_mrz(l1, l2_bad)
+    assert out["valid"] is False
+    assert "personal_number check digit mismatch" in out["mismatches"]
+
+def test_tamper_composite_cd_triggers_mismatch():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    l2_bad = l2[:43] + flip_digit_char(l2[43])
+    out = validate_mrz(l1, l2_bad)
+    assert out["valid"] is False
+    assert "composite check digit mismatch" in out["mismatches"]
+
+
+
+
+# ------------------------------
+# Structural / positioning checks
+# ------------------------------
+def test_line2_field_positions_and_lengths_are_stable():
+    l1, l2 = encode_mrz(BASE_FIELDS)
+    assert len(l1) == 44 and len(l2) == 44
+
+    # Slices per TD3 layout implemented in MRTD.decode_mrz
+    parsed = decode_mrz(l1, l2)
+    # confirm slices align with encode inputs after canonicalization
+    assert parsed["passport_number"] == "123456789"
+    assert parsed["nationality"] == "USA"
+    assert parsed["birth_date"] == "900705"
+    assert parsed["sex"] == "F"
+    assert parsed["expiry_date"] == "300131"
+    assert len(parsed["personal_number"]) == 14  # padded to 14 with '<'
+    # check that any leftover is padding
+    trailing = l2[44:]  # should be empty
+    assert trailing == ""
+
+def test_name_sanitization_and_padding_boundaries():
+    fields = dict(BASE_FIELDS)
+    fields["surname"] = "van der Wååls!?"
+    fields["given_names"] = "Anna-María  O'Neil  Jr."
+    # also push boundary: very long names should truncate to fit 39 chars in line1 name field
+    fields["given_names"] += " " + ("X"*60)
+    l1, _ = encode_mrz(fields)
+    # line1: 2 + 3 + 39 = 44
+    assert len(l1) == 44
+    # decode back to human-readable (spaces for '<'), no punctuation outside A-Z0-9 survives
+    parsed = decode_mrz(l1, "<<"*22)  # dummy line2, decode only line1 fields we care about
+    assert "VAN" in parsed["surname"]  # diacritics stripped
+    assert "ONEIL" in parsed["given_names"]  # apostrophe removed
+    # There must be a '<<' between surname and given names per encoder
+    assert "  " not in l1[5:44]  # no double-spaces; separators are '<'
+
+# ------------------------------
+# Date format/validation edges
+# ------------------------------
+
+
+
+def test_date_accepts_yymmdd_passthrough_and_yyyy_mm_dd():
+    f = dict(BASE_FIELDS)
+    f["birth_date"] = "900705"   # passthrough
+    f["expiry_date"] = "2030/01/31"
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    assert p["birth_date"] == "900705"
+    assert p["expiry_date"] == "300131"
+
+# ------------------------------
+# Sex normalization (ROR/LCR)
+# ------------------------------
+@pytest.mark.parametrize("inp,expected", [
+    ("m", "M"), ("F", "F"), ("x", "X"), ("?", "<"), ("", "<")
+])
+def test_sex_normalization_and_default(inp, expected):
+    f = dict(BASE_FIELDS)
+    f["sex"] = inp
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    assert p["sex"] == expected
+
+# ------------------------------
+# Padding/truncation for codes and numbers
+# ------------------------------
+@pytest.mark.parametrize("code,expected", [
+    ("D", "D<<"),
+    ("DE", "DE<"),
+    ("", "<<<"),
+])
+def test_issuing_and_nationality_padding(code, expected):
+    f = dict(BASE_FIELDS)
+    f["issuing_state"] = code
+    f["nationality"] = code
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    assert p["issuing_state"] == expected
+    assert p["nationality"] == expected
+
+def test_passport_number_length_truncates_and_rechecks():
+    f = dict(BASE_FIELDS)
+    f["passport_number"] = "A123456789XYZ"  # >9, must truncate to 9
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    assert p["passport_number"] == "A12345678"  # first 9 after truncation
+    # And the CD must match the truncated data
+    assert fletcher4_check_digit(p["passport_number"]) == p["passport_number_cd"]
+    assert validate_mrz(l1, l2)["valid"] is True
+
+def test_personal_number_padding_and_cd_consistency():
+    f = dict(BASE_FIELDS)
+    f["personal_number"] = "X1"  # should pad to 14 with '<'
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    assert p["personal_number"].startswith("X1")
+    assert len(p["personal_number"]) == 14
+    assert set(p["personal_number"][2:]) <= {"<"}
+    # check digit recomputes correctly
+    assert fletcher4_check_digit(p["personal_number"]) == p["personal_number_cd"]
+
+# ------------------------------
+# Composite rebuild oracle check
+# ------------------------------
+def test_composite_recomputed_matches_reference_build():
+    f = dict(BASE_FIELDS)
+    l1, l2 = encode_mrz(f)
+    p = decode_mrz(l1, l2)
+    composite_src = (
+        p["passport_number"] + p["passport_number_cd"] +
+        p["birth_date"] + p["birth_date_cd"] +
+        p["expiry_date"] + p["expiry_date_cd"] +
+        p["personal_number"] + p["personal_number_cd"]
+    )
+    assert fletcher4_check_digit(composite_src) == p["composite_cd"]
+
+# ------------------------------
+# Randomized smoke over diverse data (catches COI/ROR around edge chars)
+# ------------------------------
+@pytest.mark.parametrize("surname,given,number,nat,sex", [
+    ("O'BRIEN", "ANNE-MARIE", "Z9Y8X7W6V", "GBR", "F"),
+    ("SMITH JR", "ALAN", "A1B2C3D4E", "CAN", "M"),
+    ("LEE", "TAY LOR", "QWERTY123", "DE", "X"),
+    ("NÚÑEZ", "JOSÉ", "000000001", "EUE", "<"),
+    ("MÜLLER", "FRITZ-KARL", "12345678Z", "D", "x"),
+])
+def test_diverse_inputs_roundtrip_and_validate(surname, given, number, nat, sex):
+    f = dict(BASE_FIELDS)
+    f.update({
+        "surname": surname,
+        "given_names": given,
+        "passport_number": number,
+        "nationality": nat,
+        "issuing_state": nat,
+        "sex": sex,
+    })
+    l1, l2 = encode_mrz(f)
+    out = validate_mrz(l1, l2)
+    assert out["valid"] is True
+    # sanity: decode returns 44/44 structure and non-empty composites
+    p = out["fields"]
+    assert len(p["passport_number"]) == 9
+    assert p["composite_cd"].isdigit()
