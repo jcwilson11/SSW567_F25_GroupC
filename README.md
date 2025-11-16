@@ -22,7 +22,7 @@ Part 3 (Performance Testing):
 - Encodes a large set of decoded passport records (`records_decoded.json`) into MRZ format (`records_encoded.json`).
 - Measures encode/decode execution time for varying input sizes (`n = 100, 1000, 2000, …, 10000`).
 - Compares **with-tests** vs **without-tests** versions of encoding and decoding.
-- Outputs timing results to `mrtd_timing.csv` and (optionally) an Excel workbook with a performance plot.
+- Outputs timing results to `mrtd_timing.csv` and  an Excel workbook with a performance plot.
 
 ---
 
@@ -78,8 +78,6 @@ You have a pytest file.
 ```shell
 python -m pytest -q SSW567_F25_GroupC\MTTDtest.py
 ```
-
-- Optional: coverage for MRTD.py via pytest
 
 ```shell
 python -m pytest --maxfail=1 -q --cov=MRTD --cov-report=term-missing SSW567_F25_GroupC\MTTDtest.py
