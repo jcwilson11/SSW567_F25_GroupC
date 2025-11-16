@@ -39,9 +39,9 @@ SSW567_F25_GroupC/
   records_decoded.json         # Input data: decoded passport records (provided/fictitious)
   records_encoded.json         # Generated MRZ records (created by create_encoded_file.py)
   mrtd_timing.csv              # Timing measurements (created by performance_test.py)
-  mrtd_timing_with_chart.xlsx  # (Optional) Excel workbook with timing data + performance chart
+  mrtd_timing_with_chart.xlsx  # Excel workbook with timing data + performance chart
 
-  MRTD_Performance_Report.docx # (Optional) Part 3 write-up/report
+  MRTD_Performance_Report.docx # Part 3 report
   README.md                    # this file
 ```
 
